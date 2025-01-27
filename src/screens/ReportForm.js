@@ -1,3 +1,378 @@
+// import React, { useState, useEffect } from 'react';
+// import {
+//   View,
+//   TextInput,
+//   TouchableOpacity,
+//   Image,
+//   StyleSheet,
+//   Alert,
+//   ScrollView,
+//   Text,
+//   ActivityIndicator,
+// } from 'react-native';
+// import Ionicons from 'react-native-vector-icons/Ionicons';
+// import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+// import Geolocation from '@react-native-community/geolocation';
+// import axios from 'axios';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// const ReportForm = ({ navigation }) => {
+//   // State management
+//   const [description, setDescription] = useState('');
+//   const [image, setImage] = useState(null);
+//   const [location, setLocation] = useState(null);
+//   const [userName, setUserName] = useState('');
+//   const [loading, setLoading] = useState(false);
+
+//   // Colors
+//   const colors = {
+//     primary: '#2196F3',
+//     secondary: '#64B5F6',
+//     background: '#FFFFFF',
+//     text: '#333333',
+//     lightGray: '#E0E0E0',
+//     darkGray: '#757575',
+//     error: '#F44336',
+//     success: '#4CAF50',
+//   };
+
+//   useEffect(() => {
+//     const loadUserName = async () => {
+//       const name = await AsyncStorage.getItem('userName');
+//       setUserName(name || '');
+//     };
+//     loadUserName();
+//     getCurrentLocation();
+//   }, []);
+
+//   const getCurrentLocation = () => {
+//     Geolocation.getCurrentPosition(
+//       (position) => {
+//         setLocation({
+//           latitude: position.coords.latitude,
+//           longitude: position.coords.longitude,
+//         });
+//       },
+//       (error) => {
+//         console.error('Location error:', error);
+//         Alert.alert(
+//           'Location Error',
+//           `Error Code: ${error.code}\nMessage: ${error.message}`,
+//           [{ text: 'OK' }]
+//         );
+//       },
+//       { enableHighAccuracy: false, timeout: 30000, maximumAge: 10000 }
+//     );
+//   };
+
+//   const handleImagePicker = async (type) => {
+//     const options = {
+//       mediaType: 'photo',
+//       quality: 1,
+//       maxWidth: 1280,
+//       maxHeight: 1280,
+//     };
+
+//     try {
+//       const response = type === 'camera' 
+//         ? await launchCamera(options)
+//         : await launchImageLibrary(options);
+
+//       if (response.assets && response.assets[0]) {
+//         setImage(response.assets[0]);
+//       }
+//     } catch (error) {
+//       Alert.alert('Error', 'Failed to pick image');
+//     }
+//   };
+
+//   const handleSubmit = async () => {
+//     if (!image || !description || !location) {
+//       Alert.alert('Missing Information', 'Please fill all required fields');
+//       return;
+//     }
+
+//     setLoading(true);
+//     try {
+//       const token = await AsyncStorage.getItem('userToken');
+      
+//       const formData = new FormData();
+//       formData.append('image', {
+//         uri: image.uri,
+//         type: image.type || 'image/jpeg',
+//         name: image.fileName || 'photo.jpg',
+//       });
+//       formData.append('description', description);
+//       formData.append('latitude', location.latitude);
+//       formData.append('longitude', location.longitude);
+
+//       const response = await axios.post('http://192.168.0.108:8000/api/reports/', formData, {
+//         headers: {
+//           'Content-Type': 'multipart/form-data',
+//           Authorization: `Bearer ${token}`,
+//         },
+//       });
+
+//       navigation.replace('Home', {
+//         newReport: response.data,
+//         focusLocation: {
+//           latitude: location.latitude,
+//           longitude: location.longitude
+//         }
+//       });
+//     } catch (error) {
+//       Alert.alert('Error', 'Failed to submit report');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Custom button component for consistency
+//   const CustomButton = ({ onPress, icon, title, style }) => (
+//     <TouchableOpacity
+//       style={[styles.customButton, style]}
+//       onPress={onPress}
+//       activeOpacity={0.8}
+//     >
+//       <Ionicons name={icon} size={24} color="#FFFFFF" />
+//       <Text style={styles.buttonText}>{title}</Text>
+//     </TouchableOpacity>
+//   );
+
+//   return (
+//     <ScrollView 
+//       style={styles.scrollView}
+//       contentContainerStyle={styles.container}
+//       showsVerticalScrollIndicator={false}
+//     >
+//       {/* Header Section */}
+//       <View style={styles.headerSection}>
+//         <Ionicons name="person-circle-outline" size={40} color={colors.primary} />
+//         <View style={styles.headerText}>
+//           <Text style={styles.label}>Reported by</Text>
+//           <Text style={styles.userName}>{userName}</Text>
+//         </View>
+//       </View>
+
+//       {/* Description Section */}
+//       <View style={styles.section}>
+//         <Text style={styles.label}>
+//           Description <Text style={styles.required}>*</Text>
+//         </Text>
+//         <TextInput
+//           style={styles.input}
+//           multiline
+//           numberOfLines={4}
+//           placeholder="Describe the garbage situation..."
+//           value={description}
+//           onChangeText={setDescription}
+//           placeholderTextColor={colors.darkGray}
+//         />
+//       </View>
+
+//       {/* Image Section */}
+//       <View style={styles.section}>
+//         <Text style={styles.label}>
+//           Photo <Text style={styles.required}>*</Text>
+//         </Text>
+//         <View style={styles.imageButtons}>
+//           <CustomButton
+//             icon="camera-outline"
+//             title="Take Photo"
+//             onPress={() => handleImagePicker('camera')}
+//             style={{ marginRight: 10 }}
+//           />
+//           {/* <CustomButton
+//             icon="images-outline"
+//             title="Gallery"
+//             onPress={() => handleImagePicker('gallery')}
+//           /> */}
+//         </View>
+        
+//         {image && (
+//           <View style={styles.imagePreviewContainer}>
+//             <Image
+//               source={{ uri: image.uri }}
+//               style={styles.preview}
+//               resizeMode="cover"
+//             />
+//             <TouchableOpacity
+//               style={styles.removeImageButton}
+//               onPress={() => setImage(null)}
+//             >
+//               <Ionicons name="close-circle" size={24} color={colors.error} />
+//             </TouchableOpacity>
+//           </View>
+//         )}
+//       </View>
+
+//       {/* Location Section */}
+//       {location && (
+//         <View style={styles.section}>
+//           <View style={styles.locationHeader}>
+//             <Ionicons name="location-outline" size={24} color={colors.primary} />
+//             <Text style={styles.label}>Location</Text>
+//           </View>
+//           <View style={styles.locationInfo}>
+//             <Text style={styles.locationText}>
+//               Latitude: {location.latitude.toFixed(6)}
+//             </Text>
+//             <Text style={styles.locationText}>
+//               Longitude: {location.longitude.toFixed(6)}
+//             </Text>
+//           </View>
+//         </View>
+//       )}
+
+//       {/* Submit Button */}
+//       <TouchableOpacity
+//         style={[styles.submitButton, (!image || !description || !location) && styles.submitButtonDisabled]}
+//         onPress={handleSubmit}
+//         disabled={loading || !image || !description || !location}
+//       >
+//         {loading ? (
+//           <ActivityIndicator color="#FFFFFF" />
+//         ) : (
+//           <>
+//             <Ionicons name="send" size={24} color="#FFFFFF" style={styles.submitIcon} />
+//             <Text style={styles.submitButtonText}>Submit Report</Text>
+//           </>
+//         )}
+//       </TouchableOpacity>
+//     </ScrollView>
+//   );
+// };
+
+// const styles = StyleSheet.create({
+//   scrollView: {
+//     flex: 1,
+//     backgroundColor: '#FFFFFF',
+//   },
+//   container: {
+//     padding: 20,
+//     marginTop: 40,
+
+//   },
+//   headerSection: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     marginBottom: 20,
+//     paddingBottom: 15,
+//     borderBottomWidth: 1,
+//     borderBottomColor: '#E0E0E0',
+//   },
+//   headerText: {
+//     marginLeft: 15,
+//   },
+//   section: {
+//     marginBottom: 25,
+//   },
+//   label: {
+//     fontSize: 16,
+//     fontWeight: '600',
+//     color: '#333333',
+//     marginBottom: 4,
+//   },
+//   required: {
+//     color: '#F44336',
+//   },
+//   userName: {
+//     fontSize: 18,
+//     fontWeight: '500',
+//     color: '#2196F3',
+//   },
+//   input: {
+//     borderWidth: 1,
+//     borderColor: '#E0E0E0',
+//     borderRadius: 12,
+//     padding: 15,
+//     minHeight: 120,
+//     textAlignVertical: 'top',
+//     fontSize: 16,
+//     backgroundColor: '#F5F5F5',
+//   },
+//   imageButtons: {
+//     flexDirection: 'row',
+//     marginBottom: 15,
+//   },
+//   customButton: {
+//     flex: 1,
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     backgroundColor: '#2196F3',
+//     padding: 12,
+//     borderRadius: 12,
+//     elevation: 2,
+//   },
+//   buttonText: {
+//     color: '#FFFFFF',
+//     fontSize: 16,
+//     fontWeight: '500',
+//     marginLeft: 8,
+//   },
+//   imagePreviewContainer: {
+//     position: 'relative',
+//     borderRadius: 12,
+//     overflow: 'hidden',
+//     elevation: 3,
+//   },
+//   preview: {
+//     width: '100%',
+//     height: 200,
+//     borderRadius: 12,
+//   },
+//   removeImageButton: {
+//     position: 'absolute',
+//     top: 10,
+//     right: 10,
+//     backgroundColor: '#FFFFFF',
+//     borderRadius: 12,
+//   },
+//   locationHeader: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     marginBottom: 10,
+//   },
+//   locationInfo: {
+//     backgroundColor: '#F5F5F5',
+//     padding: 15,
+//     borderRadius: 12,
+//   },
+//   locationText: {
+//     fontSize: 15,
+//     color: '#666666',
+//     marginBottom: 5,
+//   },
+//   submitButton: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     backgroundColor: '#4CAF50',
+//     padding: 16,
+//     borderRadius: 12,
+//     elevation: 3,
+//     marginTop: 10,
+//   },
+//   submitButtonDisabled: {
+//     backgroundColor: '#A5D6A7',
+//     elevation: 0,
+//   },
+//   submitIcon: {
+//     marginRight: 10,
+//   },
+//   submitButtonText: {
+//     color: '#FFFFFF',
+//     fontSize: 18,
+//     fontWeight: '600',
+//   },
+// });
+
+// export default ReportForm;
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -18,6 +393,7 @@ import Geolocation from '@react-native-community/geolocation';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
+import zoneData from './zone.json';
 
 const ReportForm = ({ navigation }) => {
   // State management
@@ -118,7 +494,7 @@ const ReportForm = ({ navigation }) => {
       formData.append('latitude', location.latitude);
       formData.append('longitude', location.longitude);
 
-      const response = await axios.post('http://192.168.1.111:8000/api/reports/', formData, {
+      const response = await axios.post('http://192.168.0.108:8000/api/reports/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`,
@@ -128,8 +504,8 @@ const ReportForm = ({ navigation }) => {
       navigation.replace('Home', {
         newReport: response.data,
         focusLocation: {
-          latitude: location.latitude,
-          longitude: location.longitude
+          latitude: 19.1334,
+          longitude: 72.9133
         }
       });
     } catch (error) {
@@ -154,9 +530,9 @@ const ReportForm = ({ navigation }) => {
 
   // Function to generate the HTML content for the Leaflet map
   const generateMapHTML = () => {
-    const initialLat = tempLocation?.latitude || 0;
-    const initialLng = tempLocation?.longitude || 0;
-
+    const initialLat = tempLocation?.latitude || 19.1334;
+    const initialLng = tempLocation?.longitude || 72.9133;
+  
     return `
       <!DOCTYPE html>
       <html>
@@ -165,39 +541,121 @@ const ReportForm = ({ navigation }) => {
           <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <style>
-            body { margin: 0; padding: 0; }
-            #map { width: 100vw; height: 100vh; }
+            body { padding: 0; margin: 0; }
+            #map { width: 100%; height: 100vh; }
+            .custom-marker {
+              width: 30px;
+              height: 30px;
+              background: white;
+              border: 2px solid #ff4444;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+            }
+            .marker-inner {
+              width: 8px;
+              height: 8px;
+              background: #ff4444;
+              border-radius: 50%;
+            }
+            .zone-popup {
+              font-size: 14px;
+              line-height: 1.4;
+            }
           </style>
         </head>
         <body>
           <div id="map"></div>
           <script>
+            // Store the zone data globally
+            const zones = ${JSON.stringify(zoneData)};
+  
+            function getZoneColor(zoneNumber) {
+              const colors = [
+                '#2196F3', '#4CAF50', '#FFC107', '#9C27B0', '#FF5722',
+                '#00BCD4', '#3F51B5', '#E91E63', '#8BC34A', '#FF9800',
+                '#009688', '#673AB7', '#795548', '#607D8B', '#F44336', 'grey'
+              ];
+              return colors[(zoneNumber - 1) % colors.length];
+            }
+  
             // Initialize the map
-            var map = L.map('map').setView([19.1334, 72.9133], 15);
+            const map = L.map('map', {
+              zoomControl: false,
+              attributionControl: true
+            }).setView([${initialLat}, ${initialLng}], 15);
             
             // Add OpenStreetMap tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
               attribution: '© OpenStreetMap contributors'
             }).addTo(map);
-
-            // Add a draggable marker
-            var marker = L.marker([${initialLat}, ${initialLng}], {
-              draggable: true
+  
+            // Add zones
+            const zoneLayer = L.geoJSON(zones, {
+              style: function(feature) {
+                return {
+                  fillColor: getZoneColor(feature.properties.Zone_No),
+                  weight: 2,
+                  opacity: 1,
+                  color: 'white',
+                  fillOpacity: 0.5
+                };
+              },
+              onEachFeature: function(feature, layer) {
+                const popupContent = \`
+                  <div class="zone-popup">
+                    <strong>\${feature.properties.Zone_Name}</strong><br>
+                    Area: \${feature.properties.Area_Name}<br>
+                    J.E.: \${feature.properties.J_E}<br>
+                    Remarks: \${feature.properties.remark}
+                  </div>
+                \`;
+                layer.bindPopup(popupContent);
+                
+                layer.on('mouseover', function (e) {
+                  this.setStyle({
+                    fillOpacity: 0.6
+                  });
+                  this.openPopup();
+                });
+                
+                layer.on('mouseout', function (e) {
+                  this.setStyle({
+                    fillOpacity: 0.3
+                  });
+                  this.closePopup();
+                });
+              }
             }).addTo(map);
-
+  
+            // Add a draggable marker
+            const customIcon = L.divIcon({
+              className: 'custom-marker',
+              html: '<div class="marker-inner"></div>',
+              iconSize: [20, 20],
+              iconAnchor: [15, 15]
+            });
+  
+            const marker = L.marker([${initialLat}, ${initialLng}], {
+              draggable: true,
+              icon: customIcon
+            }).addTo(map);
+  
             // Handle marker drag events
             marker.on('dragend', function(event) {
-              var position = marker.getLatLng();
+              const position = marker.getLatLng();
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'location',
                 latitude: position.lat,
                 longitude: position.lng
               }));
             });
-
+  
             // Handle map click events
             map.on('click', function(event) {
-              var latlng = event.latlng;
+              const latlng = event.latlng;
               marker.setLatLng(latlng);
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'location',
@@ -205,6 +663,9 @@ const ReportForm = ({ navigation }) => {
                 longitude: latlng.lng
               }));
             });
+  
+            // Fit map to zones bounds
+            map.fitBounds(zoneLayer.getBounds());
           </script>
         </body>
       </html>

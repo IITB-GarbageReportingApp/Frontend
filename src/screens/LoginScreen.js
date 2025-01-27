@@ -57,7 +57,7 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await axios.post('http://192.168.1.111:8000/api/login/', {
+      const response = await axios.post('http://192.168.0.108:8000/api/login/', {
         email,
         password,
       });
@@ -82,7 +82,7 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
       
-      const response = await axios.post('http://192.168.1.111:8000/api/send-otp/', {
+      const response = await axios.post('http://192.168.0.108:8000/api/send-otp/', {
         email,
       });
       setShowOtpInput(true);
@@ -100,7 +100,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleVerifyOtp = async () => {
     try {
-      const response = await axios.post('http://192.168.1.111:8000/api/verify-otp/', {
+      const response = await axios.post('http://192.168.0.108:8000/api/verify-otp/', {
         otp,
         password,
       });

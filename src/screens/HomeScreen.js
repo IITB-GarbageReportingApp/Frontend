@@ -19,6 +19,7 @@ import { WebView } from 'react-native-webview';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import zoneData from './zone.json';
 
 const { width, height } = Dimensions.get('window');
 
@@ -91,10 +92,11 @@ const HomeScreen = ({ navigation }) => {
   const fetchReports = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await axios.get('http://192.168.1.111:8000/api/reports/', {
+      // console.log('tokennnnnnnnnnnnnnn',token)
+      const response = await axios.get('http://192.168.0.108:8000/api/reports/', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log(response.data)
+      // console.log(response.data)
       setReports(response.data);
     } catch (error) {
       console.error('Error fetching reports:', error);
@@ -186,61 +188,187 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-      <style>
-        body { padding: 0; margin: 0; }
-        #map { width: 100%; height: 100vh; }
-        .custom-marker {
-          width: 30px;
-          height: 30px;
-          background: white;
-          border: 2px solid #ff4444;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+      body { padding: 0; margin: 0; }
+      #map { width: 100%; height: 100vh; }
+      .custom-marker {
+        width: 30px;
+        height: 30px;
+        background: white;
+        border: 2px solid #ff4444;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .marker-inner {
+        width: 8px;
+        height: 8px;
+        background: #ff4444;
+        border-radius: 50%;
+      }
+      .zone-popup {
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      .leaflet-bottom {
+    z-index: -1 !important;
+  }
+  .leaflet-control {
+    z-index: -1 !important;
+  }
+  .legend {
+    padding: 8px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: -1 !important;
+  }
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    padding: 4px;
+  }
+  .legend-color {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    border-radius: 3px;
+    opacity: 0.7;
+  }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      let map;
+      let markers = [];
+      let zoneLayer;
+      let legend;
+
+      // Store the zone data globally
+      const zones = ${JSON.stringify(zoneData)};
+
+      document.addEventListener('DOMContentLoaded', () => {
+        initMap();
+      });
+
+      function initMap() {
+        const iitBombayPosition = [19.1334, 72.9133];
+        map = L.map('map', {
+          zoomControl: false,
+          attributionControl: true
+        }).setView(iitBombayPosition, 15);          
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Add GeoJSON zones
+        addZones();
+        
+        // Add legend
+        addLegend();
+
+        // Notify React Native that the map is ready
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'MAP_READY'
+        }));
+      }
+
+      function getZoneColor(zoneNumber) {
+        const colors = [
+          '#2196F3', '#4CAF50', '#FFC107', '#9C27B0', '#FF5722',
+          '#00BCD4', '#3F51B5', '#E91E63', '#8BC34A', '#FF9800',
+          '#009688', '#673AB7', '#795548', '#607D8B', '#F44336', 'grey'
+        ];
+        return colors[(zoneNumber - 1) % colors.length];
+      }
+
+      function addZones() {
+        if (zoneLayer) {
+          zoneLayer.remove();
         }
-        .marker-inner {
-          width: 16px;
-          height: 16px;
-          background: #ff4444;
-          border-radius: 50%;
-        }
-      </style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        let map;
-        let markers = [];
 
-        document.addEventListener('DOMContentLoaded', () => {
-          initMap();
-        });
+        zoneLayer = L.geoJSON(zones, {
+          style: function(feature) {
+            return {
+              fillColor: getZoneColor(feature.properties.Zone_No),
+              weight: 2,
+              opacity: 1,
+              color: 'white',
+              fillOpacity: 0.5
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            const popupContent = \`
+              <div class="zone-popup">
+                <strong>\${feature.properties.Zone_Name}</strong><br>
+                Area: \${feature.properties.Area_Name}<br>
+                J.E.: \${feature.properties.J_E}<br>
+                Remarks: \${feature.properties.remark}
+              </div>
+            \`;
+            layer.bindPopup(popupContent);
+            
+            layer.on('mouseover', function (e) {
+              this.setStyle({
+                fillOpacity: 0.6
+              });
+              this.openPopup();
+            });
+            
+            layer.on('mouseout', function (e) {
+              this.setStyle({
+                fillOpacity: 0.3
+              });
+              this.closePopup();
+            });
+          }
+        }).addTo(map);
 
-        function initMap() {
-          const iitBombayPosition = [19.1334, 72.9133];
- map = L.map('map', {
-            zoomControl: false,
-            attributionControl: true
-          }).setView(iitBombayPosition, 15);          
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-          }).addTo(map);
+        // Fit map bounds to GeoJSON layer
+        map.fitBounds(zoneLayer.getBounds());
+      }
 
-          // Notify React Native that the map is ready
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'MAP_READY'
-          }));
-        }
+      function addLegend() {
+        legend = L.control({ position: 'bottomleft' });
+        legend.onAdd = function(map) {
+          const div = L.DomUtil.create('div', 'legend');
+          let legendContent = '<strong>Zones</strong><br>';
+          
+          zones.features.forEach(zone => {
+            const color = getZoneColor(zone.properties.Zone_No);
+            legendContent += \`
+              <div class="legend-item">
+                <div class="legend-color" style="background: \${color}"></div>
+                <div>Zone \${zone.properties.Zone_No}</div>
+              </div>
+            \`;
+          });
+          
+          div.innerHTML = legendContent;
+          return div;
+        };
+        legend.addTo(map);
+      }
 
-        function updateMarkers(reports) {
+      function updateMarkers(reports) {
           // Clear existing markers
           markers.forEach(marker => marker.remove());
           markers = [];
@@ -248,7 +376,7 @@ const HomeScreen = ({ navigation }) => {
           const customIcon = L.divIcon({
             className: 'custom-marker',
             html: '<div class="marker-inner"></div>',
-            iconSize: [30, 30],
+            iconSize: [20, 20],
             iconAnchor: [15, 15]
           });
 
@@ -269,10 +397,10 @@ const HomeScreen = ({ navigation }) => {
             markers.push(marker);
           });
         }
-      </script>
-    </body>
-    </html>
-  `;
+    </script>
+  </body>
+  </html>
+`;
 
   const handleMessage = (event) => {
     try {
@@ -286,6 +414,27 @@ const HomeScreen = ({ navigation }) => {
       console.error('Error handling message:', error);
     }
   };
+
+  const formatStatus = (status) => {
+    const statusMap = {
+      'SENT': 'Sent',
+      'RECEIVED': 'Received',
+      'IN_PROGRESS': 'In Progress',
+      'COMPLETED': 'Completed'
+    };
+    return statusMap[status] || status;
+  };
+  
+  const getStatusStyle = (status) => {
+    const statusColors = {
+      'SENT': { backgroundColor: '#FFA726' },
+      'RECEIVED': { backgroundColor: '#42A5F5' },
+      'IN_PROGRESS': { backgroundColor: '#66BB6A' },
+      'COMPLETED': { backgroundColor: '#4CAF50' }
+    };
+    return statusColors[status] || { backgroundColor: '#757575' };
+  };
+
 
   return (
     <View style={styles.container}>
@@ -381,11 +530,29 @@ const HomeScreen = ({ navigation }) => {
                   </View>
   
                   <View style={styles.descriptionContainer}>
-                    <Text style={styles.descriptionTitle}>Description</Text>
-                    <Text style={styles.description}>
-                      {selectedReport.description}
-                    </Text>
-                  </View>
+  <Text style={styles.descriptionTitle}>Description</Text>
+  <Text style={styles.description}>
+    {selectedReport.description}
+  </Text>
+  
+  <View style={styles.statusContainer}>
+    <View style={styles.statusSection}>
+      <Text style={styles.statusLabel}>Zone</Text>
+      <View style={styles.zoneTag}>
+        <Ionicons name="map-outline" size={16} color="#2196F3" />
+        <Text style={styles.zoneText}>{selectedReport.zone || 'Unknown Zone'}</Text>
+      </View>
+    </View>
+    
+    <View style={styles.statusSection}>
+      <Text style={styles.statusLabel}>Status</Text>
+      <View style={[styles.statusTag, getStatusStyle(selectedReport.status)]}>
+        <Ionicons name="time-outline" size={16} color="#FFFFFF" />
+        <Text style={styles.statusText}>{formatStatus(selectedReport.status)}</Text>
+      </View>
+    </View>
+  </View>
+</View>
                 </ScrollView>
               </>
             )}
@@ -573,6 +740,43 @@ const styles = StyleSheet.create({
       fontSize: 16,
       color: '#34495E',
       lineHeight: 24,
+    },
+    statusContainer: {
+      marginTop: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    statusSection: {
+      flex: 1,
+      marginRight: 8,
+    },
+    statusLabel: {
+      fontSize: 14,
+      color: '#666666',
+      marginBottom: 4,
+    },
+    zoneTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#E3F2FD',
+      padding: 8,
+      borderRadius: 8,
+    },
+    zoneText: {
+      marginLeft: 4,
+      color: '#2196F3',
+      fontWeight: '500',
+    },
+    statusTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 8,
+      borderRadius: 8,
+    },
+    statusText: {
+      marginLeft: 4,
+      color: '#FFFFFF',
+      fontWeight: '500',
     },
   });
 
