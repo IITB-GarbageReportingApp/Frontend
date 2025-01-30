@@ -13,7 +13,7 @@ import {
   StatusBar,
   Animated,
   Platform,
-  BlurView
+  Linking
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import axios from 'axios';
@@ -55,6 +55,25 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [routeParams?.newReport, isMapReady]);
 
+
+  const openDirections = (latitude, longitude) => {
+    const scheme = Platform.select({ ios: 'maps:', android: 'geo:' });
+    const url = Platform.select({
+      ios: `maps://app?daddr=${latitude},${longitude}`,
+      android: `google.navigation:q=${latitude},${longitude}`
+    });
+
+    Linking.canOpenURL(url).then((supported) => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        // Fallback to browser if native maps app not available
+        const browserUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+        Linking.openURL(browserUrl);
+      }
+    });
+  };
+
   const zoomToLocation = (latitude, longitude) => {
     const zoomLevel = 18;
     webViewRef.current?.injectJavaScript(`
@@ -92,7 +111,7 @@ const HomeScreen = ({ navigation }) => {
   const fetchReports = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      // console.log('tokennnnnnnnnnnnnnn',token)
+      console.log('tokennnnnnnnnnnnnnn',token)
       const response = await axios.get('http://192.168.0.108:8000/api/reports/', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -111,6 +130,7 @@ const HomeScreen = ({ navigation }) => {
     try {
       const reportId = JSON.parse(event.nativeEvent.data).reportId;
       const report = reports.find(r => r.id === reportId);
+      console.log(report)
       if (report) {
         setSelectedReport(report);
         setModalVisible(true);
@@ -459,8 +479,8 @@ const HomeScreen = ({ navigation }) => {
       <SafeAreaView style={styles.headerOverlay}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Campus Clean</Text>
-            <Text style={styles.headerSubtitle}>Report garbage around IIT Bombay</Text>
+            <Text style={styles.headerTitle}>Clean & Green Campus</Text>
+            <Text style={styles.headerSubtitle}>Report issue around IIT Bombay</Text>
           </View>
           <TouchableOpacity 
             style={styles.logoutButton}
@@ -506,7 +526,10 @@ const HomeScreen = ({ navigation }) => {
                     <View style={styles.reporterInfo}>
                       <Ionicons name="person-circle-outline" size={40} color="#2196F3" />
                       <View style={styles.reporterDetails}>
-                        <Text style={styles.reporterName}>{selectedReport.user}</Text>
+                        <View style={styles.ticketRow}>
+                          <Text style={styles.ticketNumber}>Ticket Number #{selectedReport.id}</Text>
+                        </View>
+                        <Text style={styles.reporterName}>{selectedReport.username}</Text>
                         <Text style={styles.timestamp}>
                           <Ionicons name="time-outline" size={14} color="#95A5A6" />
                           {" "}{formatDate(selectedReport.reported_at)}
@@ -528,6 +551,14 @@ const HomeScreen = ({ navigation }) => {
                       </Text>
                     </View>
                   </View>
+
+                  <TouchableOpacity
+                    style={styles.directionsButton}
+                    onPress={() => openDirections(selectedReport.latitude, selectedReport.longitude)}
+                  >
+                    <Ionicons name="navigate-circle-outline" size={24} color="#FFFFFF" />
+                    <Text style={styles.directionsButtonText}>Get Directions</Text>
+                  </TouchableOpacity>
   
                   <View style={styles.descriptionContainer}>
   <Text style={styles.descriptionTitle}>Description</Text>
@@ -568,7 +599,7 @@ const HomeScreen = ({ navigation }) => {
           activeOpacity={0.8}
         >
           <Ionicons name="add-circle-outline" size={24} color="#FFFFFF" />
-          <Text style={styles.reportButtonText}>Report Garbage</Text>
+          <Text style={styles.reportButtonText}>Report</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </View>
@@ -586,8 +617,42 @@ const styles = StyleSheet.create({
     map: {
       ...StyleSheet.absoluteFillObject,
     },
-  
-    // Header styles
+    ticketRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    ticketNumber: {
+      fontSize: 14,
+      color: '#2196F3',
+      fontWeight: '600',
+    },
+    directionsButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#2196F3',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 20,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+    },
+    directionsButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    reporterName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#333333',
+      marginBottom: 2,
+    },
     headerOverlay: {
       position: 'absolute',
       top: 0,

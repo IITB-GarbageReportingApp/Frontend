@@ -61,7 +61,7 @@
 //           [{ text: 'OK' }]
 //         );
 //       },
-//       { enableHighAccuracy: false, timeout: 30000, maximumAge: 10000 }
+//       { enableHighAccuracy: false, timeout: 300000, maximumAge: 10000 }
 //     );
 //   };
 
@@ -428,6 +428,37 @@ const ReportForm = ({ navigation }) => {
     loadUserName();
   }, []);
 
+  useEffect(() => {
+    const initializeLocation = async () => {
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          setLocation(newLocation);
+          setTempLocation(newLocation);
+          setLocationType('auto');
+        },
+        (error) => {
+          console.error('Initial location error:', error);
+          // Set default location if getting current location fails
+          const defaultLocation = {
+            latitude: 19.1334,
+            longitude: 72.9133,
+          };
+          setLocation(defaultLocation);
+          setTempLocation(defaultLocation);
+        },
+        { enableHighAccuracy: false, timeout: 30000, maximumAge: 10000 }
+      );
+    };
+
+    initializeLocation();
+  }, []);
+
+  
+
   const getCurrentLocation = () => {
     Geolocation.getCurrentPosition(
       (position) => {
@@ -439,7 +470,6 @@ const ReportForm = ({ navigation }) => {
         setTempLocation(newLocation);
         setLocationType('auto');
         // Force WebView refresh when location changes
-        setWebViewKey(prev => prev + 1);
       },
       (error) => {
         console.error('Location error:', error);
@@ -629,6 +659,11 @@ const ReportForm = ({ navigation }) => {
                 });
               }
             }).addTo(map);
+
+            // Add zoom control to bottom right
+            L.control.zoom({
+              position: 'bottomright'
+            }).addTo(map);
   
             // Add a draggable marker
             const customIcon = L.divIcon({
@@ -642,6 +677,9 @@ const ReportForm = ({ navigation }) => {
               draggable: true,
               icon: customIcon
             }).addTo(map);
+
+                        map.setView([${initialLat}, ${initialLng}], 16);
+
   
             // Handle marker drag events
             marker.on('dragend', function(event) {
@@ -665,8 +703,9 @@ const ReportForm = ({ navigation }) => {
             });
   
             // Fit map to zones bounds
+map.on('load', function() {
             map.fitBounds(zoneLayer.getBounds());
-          </script>
+          });          </script>
         </body>
       </html>
     `;
@@ -970,6 +1009,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+    marginTop: 20,
   },
   locationInfo: {
     backgroundColor: '#F5F5F5',
