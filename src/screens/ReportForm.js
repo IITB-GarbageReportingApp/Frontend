@@ -106,7 +106,7 @@
 //       formData.append('latitude', location.latitude);
 //       formData.append('longitude', location.longitude);
 
-//       const response = await axios.post('http://192.168.0.108:8000/api/reports/', formData, {
+//       const response = await axios.post('http://192.168.227.240:8000/api/reports/', formData, {
 //         headers: {
 //           'Content-Type': 'multipart/form-data',
 //           Authorization: `Bearer ${token}`,
@@ -386,6 +386,8 @@ import {
   ActivityIndicator,
   Modal,
   Dimensions,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
@@ -407,6 +409,8 @@ const ReportForm = ({ navigation }) => {
   const [tempLocation, setTempLocation] = useState(null);
   const [locationType, setLocationType] = useState('auto');
   const [webViewKey, setWebViewKey] = useState(0);
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+
 
   // Colors
   const colors = {
@@ -483,7 +487,48 @@ const ReportForm = ({ navigation }) => {
     );
   };
 
+  const requestCameraPermission = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'We need access to your camera to take photos of the garbage situation.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          setHasCameraPermission(true);
+          return true;
+        } else {
+          Alert.alert(
+            'Permission Denied',
+            'We need camera access to take photos. Please enable it in your device settings.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+      } else if (Platform.OS === 'ios') {
+        // For iOS, the permission request is handled by image picker
+        return true;
+      }
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  };
+
+  // Modified handleImagePicker function with permission check
   const handleImagePicker = async (type) => {
+    if (type === 'camera') {
+      const hasPermission = await requestCameraPermission();
+      if (!hasPermission) return;
+    }
+
     const options = {
       mediaType: 'photo',
       quality: 1,
@@ -500,7 +545,11 @@ const ReportForm = ({ navigation }) => {
         setImage(response.assets[0]);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
+      if (error.code === 'E_PICKER_CANCELLED') {
+        // User cancelled the picker
+        return;
+      }
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
     }
   };
 
@@ -513,6 +562,8 @@ const ReportForm = ({ navigation }) => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
+      // const userId = await AsyncStorage.getItem('userId');
+      // console.log(userId)
       
       const formData = new FormData();
       formData.append('image', {
@@ -524,7 +575,8 @@ const ReportForm = ({ navigation }) => {
       formData.append('latitude', location.latitude);
       formData.append('longitude', location.longitude);
 
-      const response = await axios.post('http://192.168.0.108:8000/api/reports/', formData, {
+
+      const response = await axios.post('http://192.168.227.240:8000/api/reports/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`,

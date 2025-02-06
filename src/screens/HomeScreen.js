@@ -20,6 +20,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import zoneData from './zone.json';
+import { launchCamera } from 'react-native-image-picker';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,12 +29,26 @@ const HomeScreen = ({ navigation }) => {
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [unviewedReportsCount, setUnviewedReportsCount] = useState(0);
+  const [unviewedReportsModal, setUnviewedReportsModal] = useState(false);
+  const [userType, setUserType] = useState('');
+  const [workerZone, setWorkerZone] = useState(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const webViewRef = useRef(null);
   const [initialLoad, setInitialLoad] = useState(true);
   const routeParams = navigation.getState()?.routes?.find(route => route.name === 'Home')?.params;
 
   const slideAnim = useRef(new Animated.Value(height)).current;
+  const [userId, setUserId] = useState(null);
+
+useEffect(() => {
+  const checkUserDetails = async () => {
+    const storedUserId = await AsyncStorage.getItem('userId');
+    setUserId(storedUserId ? parseInt(storedUserId) : null);
+  };
+  checkUserDetails();
+}, []);
+  
 
 
   useEffect(() => {
@@ -55,6 +71,238 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [routeParams?.newReport, isMapReady]);
 
+
+  useEffect(() => {
+    const checkUserType = async () => {
+      const type = await AsyncStorage.getItem('userType');
+      console.log(type)
+      const zone = await AsyncStorage.getItem('workerZone');
+      console.log(zone)
+      setUserType(type);
+      setWorkerZone(zone ? parseInt(zone) : null);
+      
+      if (type === 'worker') {
+        fetchUnviewedReports();
+      }
+    };
+    checkUserType();
+  }, []);
+
+  const fetchUnviewedReports = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get('http://192.168.227.240:8000/api/unviewed-reports/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUnviewedReportsCount(response.data.count);
+    } catch (error) {
+      console.error('Error fetching unviewed reports:', error);
+    }
+  };
+
+  const updateReportStatus = async (reportId, status, completionImage = null) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const formData = new FormData();
+      formData.append('status', status);
+      
+      if (completionImage) {
+        formData.append('completion_image', {
+          uri: completionImage.uri,
+          type: completionImage.type,
+          name: completionImage.fileName
+        });
+      }
+
+      const response = await axios.post(
+        `http://192.168.227.240:8000/api/reports/${reportId}/update_status/`, 
+        formData,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      // Refresh reports after status update
+      fetchReports();
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Error updating report status:', error);
+      Alert.alert('Error', 'Failed to update report status');
+    }
+  };
+
+  const closeReport = async (reportId) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(
+        `http://192.168.227.240:8000/api/reports/${reportId}/close_report/`, 
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Refresh reports after closing
+      fetchReports();
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Error closing report:', error);
+      Alert.alert('Error', 'Failed to close report');
+    }
+  };
+
+  const handlePickCompletionImage = async (reportId) => {
+    try {
+
+      const options = {
+        mediaType: 'photo',
+        quality: 1,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        saveToPhotos: false, // Don't save to device gallery
+      };
+
+
+      // const result = await ImagePicker.launchImageLibrary({
+      //   mediaType: 'photo',
+      //   quality: 0.7
+      // });
+
+      const result = await launchCamera(options);
+
+  //     if (!result.didCancel) {
+  //       const image = result.assets[0];
+  //       updateReportStatus(reportId, 'COMPLETED', image);
+  //     }
+  //   } catch (error) {
+  //     console.error('Image picker error:', error);
+  //   }
+  // };
+  if (result.assets && result.assets[0]) {
+    const image = result.assets[0];
+    // Update report status with the captured image
+    updateReportStatus(reportId, 'COMPLETED', image);
+  }
+} catch (error) {
+  console.error('Camera error:', error);
+  Alert.alert('Error', 'Failed to capture image. Please try again.');
+}
+};
+
+  const renderStatusUpdateOptions = () => {
+    if (userType !== 'worker' || !selectedReport) return null;
+
+    const workerStatusOptions = [
+      { 
+        status: 'RECEIVED', 
+        label: 'Mark as Received', 
+        icon: 'checkmark-circle-outline' 
+      },
+      { 
+        status: 'IN_PROGRESS', 
+        label: 'Mark as In Progress', 
+        icon: 'hammer-outline' 
+      },
+      { 
+        status: 'COMPLETED', 
+        label: 'Take Completion Photo', 
+        icon: 'camera-outline' 
+      }
+    ];
+
+    return (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.workerActionsScrollView}
+      >
+        <View style={styles.workerActionsContainer}>
+          {workerStatusOptions.map((option) => (
+            <TouchableOpacity
+              key={option.status}
+              style={styles.workerActionButton}
+              onPress={() => {
+                if (option.status === 'COMPLETED') {
+                  handlePickCompletionImage(selectedReport.id);
+                } else {
+                  updateReportStatus(selectedReport.id, option.status);
+                }
+              }}
+            >
+              <Ionicons 
+                name={option.icon} 
+                size={20} 
+                color="#2196F3" 
+              />
+              <Text style={styles.workerActionText}>{option.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderUnviewedReportsModal = () => {
+    // Filter reports for the worker's specific zone
+    const zoneReports = reports.filter(report => 
+      userType === 'worker' && 
+      report.zone === `Zone ${workerZone}`
+    );
+
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={unviewedReportsModal}
+        onRequestClose={() => setUnviewedReportsModal(false)}
+      >
+        <View style={styles.unviewedModalContainer}>
+          <View style={styles.unviewedModalContent}>
+            <View style={styles.unviewedModalHeader}>
+              <Text style={styles.unviewedModalTitle}>
+                Unviewed Reports - Zone {workerZone}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => setUnviewedReportsModal(false)}
+                style={styles.closeModalButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              {zoneReports.map(report => (
+                <TouchableOpacity
+                  key={report.id}
+                  style={styles.unviewedReportItem}
+                  onPress={() => {
+                    setSelectedReport(report);
+                    setModalVisible(true);
+                    setUnviewedReportsModal(false);
+                  }}
+                >
+                  <View style={styles.unviewedReportItemContent}>
+                    <Text style={styles.unviewedReportTitle}>
+                      Report #{report.id}
+                    </Text>
+                    <Text style={styles.unviewedReportDescription} numberOfLines={2}>
+                      {report.description}
+                    </Text>
+                    <Text style={styles.unviewedReportDate}>
+                      {formatDate(report.reported_at)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   const openDirections = (latitude, longitude) => {
     const scheme = Platform.select({ ios: 'maps:', android: 'geo:' });
@@ -111,8 +359,8 @@ const HomeScreen = ({ navigation }) => {
   const fetchReports = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      console.log('tokennnnnnnnnnnnnnn',token)
-      const response = await axios.get('http://192.168.0.108:8000/api/reports/', {
+      //console.log('tokennnnnnnnnnnnnnn',token)
+      const response = await axios.get('http://192.168.227.240:8000/api/reports/', {
         headers: { Authorization: `Bearer ${token}` },
       });
       // console.log(response.data)
@@ -292,7 +540,8 @@ const HomeScreen = ({ navigation }) => {
         const iitBombayPosition = [19.1334, 72.9133];
         map = L.map('map', {
           zoomControl: false,
-          attributionControl: true
+          attributionControl: true,
+          
         }).setView(iitBombayPosition, 15);          
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -460,6 +709,23 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Transparent status bar to allow map to show through */}
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+  
+      {/* Unviewed Reports Indicator for Workers */}
+      {userType === 'worker' && (
+        <TouchableOpacity 
+          style={styles.unviewedReportsIndicator}
+          onPress={() => setUnviewedReportsModal(true)}
+        >
+          <Ionicons name="notifications" size={24} color="#FFFFFF" />
+          {unviewedReportsCount > 0 && (
+            <View style={styles.unviewedReportsCountBadge}>
+              <Text style={styles.unviewedReportsCountText}>
+                {unviewedReportsCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
       
       {/* Map container covering the entire screen */}
       <View style={styles.mapContainer}>
@@ -482,12 +748,29 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.headerTitle}>Clean & Green Campus</Text>
             <Text style={styles.headerSubtitle}>Report issue around IIT Bombay</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
-            <Ionicons name="log-out-outline" size={24} color="#FF4444" />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {userType === 'worker' && (
+              <TouchableOpacity 
+                style={styles.unviewedButton}
+                onPress={() => setUnviewedReportsModal(true)}
+              >
+                <Ionicons name="notifications-outline" size={24} color="#2196F3" />
+                {unviewedReportsCount > 0 && (
+                  <View style={styles.unviewedBadge}>
+                    <Text style={styles.unviewedBadgeText}>
+                      {unviewedReportsCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={24} color="#FF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
   
@@ -552,6 +835,29 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                   </View>
 
+                  {selectedReport?.completion_image && selectedReport.status === 'COMPLETED' && (
+          <View style={styles.completionImageContainer}>
+            <View style={styles.completionImageHeader}>
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+              <Text style={styles.completionImageTitle}>Completion Evidence</Text>
+              <Text style={styles.completionTimestamp}>
+                {formatDate(selectedReport.completed_at)}
+              </Text>
+            </View>
+            <Image
+              source={{ uri: selectedReport.completion_image }}
+              style={styles.completionImage}
+              resizeMode="cover"
+            />
+            {selectedReport.worker_notes && (
+              <View style={styles.workerNotesContainer}>
+                <Text style={styles.workerNotesLabel}>Worker Notes:</Text>
+                <Text style={styles.workerNotes}>{selectedReport.worker_notes}</Text>
+              </View>
+            )}
+          </View>
+        )}
+  
                   <TouchableOpacity
                     style={styles.directionsButton}
                     onPress={() => openDirections(selectedReport.latitude, selectedReport.longitude)}
@@ -561,29 +867,42 @@ const HomeScreen = ({ navigation }) => {
                   </TouchableOpacity>
   
                   <View style={styles.descriptionContainer}>
-  <Text style={styles.descriptionTitle}>Description</Text>
-  <Text style={styles.description}>
-    {selectedReport.description}
-  </Text>
+                    <Text style={styles.descriptionTitle}>Description</Text>
+                    <Text style={styles.description}>
+                      {selectedReport.description}
+                    </Text>
+                    
+                    <View style={styles.statusContainer}>
+                      <View style={styles.statusSection}>
+                        <Text style={styles.statusLabel}>Zone</Text>
+                        <View style={styles.zoneTag}>
+                          <Ionicons name="map-outline" size={16} color="#2196F3" />
+                          <Text style={styles.zoneText}>{selectedReport.zone || 'Unknown Zone'}</Text>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.statusSection}>
+                        <Text style={styles.statusLabel}>Status</Text>
+                        <View style={[styles.statusTag, getStatusStyle(selectedReport.status)]}>
+                          <Ionicons name="time-outline" size={16} color="#FFFFFF" />
+                          <Text style={styles.statusText}>{formatStatus(selectedReport.status)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
   
-  <View style={styles.statusContainer}>
-    <View style={styles.statusSection}>
-      <Text style={styles.statusLabel}>Zone</Text>
-      <View style={styles.zoneTag}>
-        <Ionicons name="map-outline" size={16} color="#2196F3" />
-        <Text style={styles.zoneText}>{selectedReport.zone || 'Unknown Zone'}</Text>
-      </View>
-    </View>
-    
-    <View style={styles.statusSection}>
-      <Text style={styles.statusLabel}>Status</Text>
-      <View style={[styles.statusTag, getStatusStyle(selectedReport.status)]}>
-        <Ionicons name="time-outline" size={16} color="#FFFFFF" />
-        <Text style={styles.statusText}>{formatStatus(selectedReport.status)}</Text>
-      </View>
-    </View>
-  </View>
-</View>
+                  {/* Worker Status Update Options */}
+                  {renderStatusUpdateOptions()}
+  
+                  {/* User-specific close report option */}
+                  {selectedReport && selectedReport.user === userId && (
+                    <TouchableOpacity
+                      style={styles.closeReportButton}
+                      onPress={() => closeReport(selectedReport.id)}
+                    >
+                      <Text style={styles.closeReportButtonText}>Close Report</Text>
+                    </TouchableOpacity>
+                  )}
                 </ScrollView>
               </>
             )}
@@ -602,6 +921,9 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.reportButtonText}>Report</Text>
         </TouchableOpacity>
       </SafeAreaView>
+  
+      {/* Unviewed Reports Modal */}
+      {renderUnviewedReportsModal()}
     </View>
   );
 };
@@ -621,6 +943,166 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 4,
+    },
+    completionImageContainer: {
+      marginTop: 2,
+      marginBottom: 12,
+      backgroundColor: 'none',
+      borderRadius: 16,
+      padding: 0,
+      marginHorizontal: 0,
+    },
+    completionImageHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    completionImageTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#4CAF50',
+      marginLeft: 8,
+      flex: 1,
+    },
+    completionTimestamp: {
+      fontSize: 12,
+      color: '#95A5A6',
+    },
+    completionImage: {
+      width: '100%',
+      height: 280,
+      borderRadius: 16,
+    },
+    workerNotesContainer: {
+      marginTop: 12,
+      padding: 12,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 8,
+    },
+    workerNotesLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#2C3E50',
+      marginBottom: 4,
+    },
+    workerNotes: {
+      fontSize: 14,
+      color: '#34495E',
+      lineHeight: 20,
+    },
+    unviewedReportsIndicator: {
+      position: 'absolute',
+      top: 50,
+      right: 20,
+      backgroundColor: '#2196F3',
+      borderRadius: 50,
+      width: 50,
+      height: 50,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 5,
+    },
+    unviewedReportsCountBadge: {
+      position: 'absolute',
+      top: -5,
+      right: -5,
+      backgroundColor: 'red',
+      borderRadius: 10,
+      width: 20,
+      height: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    unviewedReportsCountText: {
+      color: 'white',
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    workerActionsScrollView: {
+      marginVertical: 8,
+    },
+    workerActionsContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      gap: 12,
+      marginBottom: 34
+    },
+    workerActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#E3F2FD',
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      minWidth: 160,
+    },
+    workerActionText: {
+      marginLeft: 8,
+      color: '#2196F3',
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    closeReportButton: {
+      backgroundColor: '#FF4444',
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginTop: 4,
+      marginBottom: 36,
+    },
+    closeReportButtonText: {
+      color: 'white',
+      fontWeight: 'bold',
+      
+    },
+    // Unviewed Reports Modal Styles
+    unviewedModalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    unviewedModalContent: {
+      width: '90%',
+      backgroundColor: 'white',
+      borderRadius: 16,
+      maxHeight: '80%',
+    },
+    unviewedModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#E0E0E0',
+    },
+    unviewedModalTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#2C3E50',
+    },
+    unviewedReportItem: {
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#E0E0E0',
+    },
+    unviewedReportItemContent: {
+      flexDirection: 'column',
+    },
+    unviewedReportTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: '#2196F3',
+      marginBottom: 4,
+    },
+    unviewedReportDescription: {
+      fontSize: 14,
+      color: '#34495E',
+      marginBottom: 8,
+    },
+    unviewedReportDate: {
+      fontSize: 12,
+      color: '#7F8C8D',
     },
     ticketNumber: {
       fontSize: 14,
@@ -676,6 +1158,32 @@ const styles = StyleSheet.create({
       fontSize: 14,
       color: '#666666',
       marginTop: 4,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    unviewedButton: {
+      padding: 8,
+      marginRight: 8,
+      position: 'relative',
+    },
+    unviewedBadge: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      backgroundColor: '#FF4444',
+      borderRadius: 10,
+      minWidth: 18,
+      height: 18,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+    },
+    unviewedBadgeText: {
+      color: 'white',
+      fontSize: 10,
+      fontWeight: 'bold',
     },
     logoutButton: {
       padding: 8,

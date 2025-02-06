@@ -14,6 +14,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ const LoginScreen = ({ navigation }) => {
   const [isNewUser, setIsNewUser] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [userType, setUserType] = useState('user');
 
   useEffect(() => {
     checkLoginStatus();
@@ -47,13 +49,26 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await axios.post('http://192.168.0.108:8000/api/login/', {
+      const response = await axios.post('http://192.168.227.240:8000/api/login/', {
         email,
         password,
+        user_type: userType
       });
+
+      await AsyncStorage.setItem('userId', String(response.data.user.id));
+
       
       await AsyncStorage.setItem('userToken', response.data.token);
       await AsyncStorage.setItem('userName', email.split('@')[0]);
+      await AsyncStorage.setItem('userType', userType);
+      
+      
+      // Store worker zone if applicable
+      if (userType === 'worker' && response.data.user.worker_profile) {
+        await AsyncStorage.setItem('workerZone', 
+          response.data.user.worker_profile.zone.toString());
+      }
+      
       navigation.replace('Home');
     } catch (error) {
       Alert.alert('Error', error.response?.data?.error || 'Invalid email or password');
@@ -67,7 +82,7 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
       
-      await axios.post('http://192.168.0.108:8000/api/send-otp/', { email });
+      await axios.post('http://192.168.227.240:8000/api/send-otp/', { email });
       setShowOtpInput(true);
       Alert.alert('Success', 'OTP sent to your email');
     } catch (error) {
@@ -77,12 +92,13 @@ const LoginScreen = ({ navigation }) => {
 
   const handleVerifyOtp = async () => {
     try {
-      const response = await axios.post('http://192.168.0.108:8000/api/verify-otp/', {
+      const response = await axios.post('http://192.168.227.240:8000/api/verify-otp/', {
         otp,
         password,
       });
       await AsyncStorage.setItem('userToken', response.data.token);
       await AsyncStorage.setItem('userName', email.split('@')[0]);
+      await AsyncStorage.setItem('userType', userType);
       navigation.replace('Home');
     } catch (error) {
       Alert.alert('Error', 'Invalid OTP');
@@ -113,6 +129,48 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.title}>
                 {isNewUser ? 'Create Account' : 'Welcome Back'}
               </Text>
+
+              {/* User Type Selection */}
+              <View style={styles.userTypeContainer}>
+                <TouchableOpacity 
+                  style={[
+                    styles.userTypeButton, 
+                    userType === 'user' && styles.selectedUserType
+                  ]}
+                  onPress={() => setUserType('user')}
+                >
+                  <Ionicons 
+                    name="person-outline" 
+                    size={20} 
+                    color={userType === 'user' ? '#FFFFFF' : '#2196F3'} 
+                  />
+                  <Text style={[
+                    styles.userTypeText, 
+                    userType === 'user' && styles.selectedUserTypeText
+                  ]}>
+                    User
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[
+                    styles.userTypeButton, 
+                    userType === 'worker' && styles.selectedUserType
+                  ]}
+                  onPress={() => setUserType('worker')}
+                >
+                  <Ionicons 
+                    name="build-outline" 
+                    size={20} 
+                    color={userType === 'worker' ? '#FFFFFF' : '#2196F3'} 
+                  />
+                  <Text style={[
+                    styles.userTypeText, 
+                    userType === 'worker' && styles.selectedUserTypeText
+                  ]}>
+                    J . E .
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               <TextInput
                 style={styles.input}
@@ -280,6 +338,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '500',
+  },
+  userTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  userTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    borderRadius: 10,
+  },
+  selectedUserType: {
+    backgroundColor: '#2196F3',
+  },
+  userTypeText: {
+    color: '#2196F3',
+    marginLeft: 5,
+    fontWeight: '600',
+  },
+  selectedUserTypeText: {
+    color: '#FFFFFF',
   },
 });
 
