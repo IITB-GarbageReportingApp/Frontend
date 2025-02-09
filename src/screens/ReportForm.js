@@ -106,7 +106,7 @@
 //       formData.append('latitude', location.latitude);
 //       formData.append('longitude', location.longitude);
 
-//       const response = await axios.post('http://192.168.227.240:8000/api/reports/', formData, {
+//       const response = await axios.post('https://api.iitbcleanandgreen.in/api/reports/', formData, {
 //         headers: {
 //           'Content-Type': 'multipart/form-data',
 //           Authorization: `Bearer ${token}`,
@@ -391,6 +391,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import VideoPlayer from 'react-native-video-player'; // You'll need to install this package
+
 import Geolocation from '@react-native-community/geolocation';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -401,6 +403,7 @@ const ReportForm = ({ navigation }) => {
   // State management
   const [description, setDescription] = useState('');
   const [image, setImage] = useState(null);
+  const [video, setVideo] = useState(null);
   const [location, setLocation] = useState(null);
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -553,6 +556,29 @@ const ReportForm = ({ navigation }) => {
     }
   };
 
+  const handleVideoPicker = async (type) => {
+    const options = {
+      mediaType: 'video',
+      videoQuality: 'medium',
+      durationLimit: 30, // Limit video length to 30 seconds
+    };
+
+    try {
+      const response = type === 'camera' 
+        ? await launchCamera(options)
+        : await launchImageLibrary(options);
+
+      if (response.assets && response.assets[0]) {
+        setVideo(response.assets[0]);
+      }
+    } catch (error) {
+      if (error.code === 'E_PICKER_CANCELLED') {
+        return;
+      }
+      Alert.alert('Error', 'Failed to capture video. Please try again.');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!image || !description || !location) {
       Alert.alert('Missing Information', 'Please fill all required fields');
@@ -571,12 +597,21 @@ const ReportForm = ({ navigation }) => {
         type: image.type || 'image/jpeg',
         name: image.fileName || 'photo.jpg',
       });
+
+      if (video) {
+        formData.append('video', {
+          uri: video.uri,
+          type: video.type || 'video/mp4',
+          name: video.fileName || 'video.mp4',
+        });
+      }
+
       formData.append('description', description);
       formData.append('latitude', location.latitude);
       formData.append('longitude', location.longitude);
 
 
-      const response = await axios.post('http://192.168.227.240:8000/api/reports/', formData, {
+      const response = await axios.post('https://api.iitbcleanandgreen.in/api/reports/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`,
@@ -863,6 +898,40 @@ map.on('load', function() {
     </View>
   );
 
+  // Add this section in your return statement after the Image Section
+  const VideoSection = () => (
+    <View style={styles.section}>
+      <Text style={styles.label}>
+        Video (Optional)
+      </Text>
+      <View style={styles.imageButtons}>
+        <CustomButton
+          icon="videocam-outline"
+          title="Record Video"
+          onPress={() => handleVideoPicker('camera')}
+          style={{ marginRight: 10 }}
+        />
+      </View>
+      
+      {video && (
+        <View style={styles.videoPreviewContainer}>
+          <VideoPlayer
+            video={{ uri: video.uri }}
+            videoWidth={1280}
+            videoHeight={720}
+            thumbnail={{ uri: video.thumbnail }}
+          />
+          <TouchableOpacity
+            style={styles.removeVideoButton}
+            onPress={() => setVideo(null)}
+          >
+            <Ionicons name="close-circle" size={24} color={colors.error} />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <ScrollView 
       style={styles.scrollView}
@@ -930,6 +999,9 @@ map.on('load', function() {
         )}
       </View>
 
+      <VideoSection />
+
+
       {/* Location Section */}
       {location && (
         <View style={styles.section}>
@@ -980,6 +1052,19 @@ const styles = StyleSheet.create({
     padding: 20,
     marginTop: 40,
 
+  },
+  videoPreviewContainer: {
+    marginTop: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  removeVideoButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'white',
+    borderRadius: 12,
   },
   headerSection: {
     flexDirection: 'row',

@@ -49,7 +49,7 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await axios.post('http://192.168.227.240:8000/api/login/', {
+      const response = await axios.post('https://api.iitbcleanandgreen.in/api/login/', {
         email,
         password,
         user_type: userType
@@ -82,7 +82,7 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
       
-      await axios.post('http://192.168.227.240:8000/api/send-otp/', { email });
+      await axios.post('https://api.iitbcleanandgreen.in/api/send-otp/', { email });
       setShowOtpInput(true);
       Alert.alert('Success', 'OTP sent to your email');
     } catch (error) {
@@ -92,7 +92,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleVerifyOtp = async () => {
     try {
-      const response = await axios.post('http://192.168.227.240:8000/api/verify-otp/', {
+      const response = await axios.post('https://api.iitbcleanandgreen.in/api/verify-otp/', {
         otp,
         password,
       });

@@ -91,7 +91,7 @@ useEffect(() => {
   const fetchUnviewedReports = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await axios.get('http://192.168.227.240:8000/api/unviewed-reports/', {
+      const response = await axios.get('https://api.iitbcleanandgreen.in/api/unviewed-reports/', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUnviewedReportsCount(response.data.count);
@@ -115,7 +115,7 @@ useEffect(() => {
       }
 
       const response = await axios.post(
-        `http://192.168.227.240:8000/api/reports/${reportId}/update_status/`, 
+        `https://api.iitbcleanandgreen.in/api/reports/${reportId}/update_status/`, 
         formData,
         {
           headers: { 
@@ -138,7 +138,7 @@ useEffect(() => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       await axios.post(
-        `http://192.168.227.240:8000/api/reports/${reportId}/close_report/`, 
+        `https://api.iitbcleanandgreen.in/api/reports/${reportId}/close_report/`, 
         {},
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -360,10 +360,10 @@ useEffect(() => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       //console.log('tokennnnnnnnnnnnnnn',token)
-      const response = await axios.get('http://192.168.227.240:8000/api/reports/', {
+      const response = await axios.get('https://api.iitbcleanandgreen.in/api/reports/', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // console.log(response.data)
+      console.log(response.data)
       setReports(response.data);
     } catch (error) {
       console.error('Error fetching reports:', error);
